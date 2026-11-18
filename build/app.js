@@ -155,8 +155,7 @@ mountHours("#examHours", EXAMS);
   const map = $("#map"), cards = $("#cards"); if(!map) return;
   const T = [ ["YT","we","Yukon"],["NT","we","Northwest Territories"],["NU","we","Nunavut"],null,null,null,null,null,
               ["BC","we","British Columbia"],["AB","we","Alberta"],["SK","we","Saskatchewan"],["MB","we","Manitoba"],["ON","on","Ontario"],["QC","qc","Quebec"],null,["NL","at","Newfoundland and Labrador"],
-              null,null,null,null,null,["NB","at","New Brunswick"],["PE","at","Prince Edward Island"],["NS","at","Nova Scotia"],
-              null,null,null,null,null,null,null,["BM","at","Bermuda"] ];
+              null,null,null,null,null,["NB","at","New Brunswick"],["PE","at","Prince Edward Island"],["NS","at","Nova Scotia"] ];
   T.forEach(t=>{
     if(!t){ map.appendChild(el("span",{class:"sp"})); return; }
     const b = el("button",{type:"button",class:t[1],style:`--c:var(--${t[1]})`,"aria-label":`${t[2]}: ${REG[t[1]].body}`},t[0]);

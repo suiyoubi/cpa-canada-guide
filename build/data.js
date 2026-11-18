@@ -5,14 +5,14 @@ const REG = {
   on:{name:"Ontario", body:"CPA Ontario", short:"ON"},
   qc:{name:"Quebec", body:"Ordre des CPA du Québec", short:"QC"},
   we:{name:"West", body:"CPA Western School of Business + BC, AB, SK, MB, YT, NT/NU", short:"West"},
-  at:{name:"Atlantic", body:"CPA Atlantic School of Business + NS, NB, NL, PEI, Bermuda", short:"Atl."}
+  at:{name:"Atlantic", body:"CPA Atlantic School of Business + NS, NB, NL, PEI", short:"Atl."}
 };
 
 /* ---------------- sources ---------------- */
 const SRC = {
   N1:{g:"National program documents", org:"CPA profession (published by provincial bodies)", t:"CPA Professional Program Exam Guide", up:"Issued Aug 27, 2026", u:"https://assets.cpaontario.ca/students/pdf/cpa-pp-exam-guide.pdf", f:"references/01-national-core/CPA-Professional-Program-Exam-Guide.pdf"},
   N2:{g:"National program documents", org:"CPA profession (published by provincial bodies)", t:"CPA Professional Program Module Guide", up:"Issued Aug 25, 2026", u:"https://assets.cpaontario.ca/students/pdf/cpa-pp-module-guide.pdf", f:"references/01-national-core/CPA-Professional-Program-Module-Guide.pdf"},
-  N3:{g:"National program documents", org:"CPA Canada with all provincial, territorial and Bermuda bodies", t:"Leading the Way: Competency Map 2.0", up:"Issued Feb 2022", u:"https://assets.cpaontario.ca/students/pdf/cpa-competency-map.pdf", f:"references/01-national-core/CPA-Competency-Map.pdf"},
+  N3:{g:"National program documents", org:"CPA Canada with the provincial and territorial bodies", t:"Leading the Way: Competency Map 2.0", up:"Issued Feb 2022", u:"https://assets.cpaontario.ca/students/pdf/cpa-competency-map.pdf", f:"references/01-national-core/CPA-Competency-Map.pdf"},
 
   N4:{g:"National program documents", org:"CPA Canada", t:"PSI programs accredited by the CPA profession (national list of accredited programs and the CPA PEP modules each covers)", up:"Internet Archive capture of Sep 27, 2023 (the document itself carries no date), used because cpacanada.ca blocks automated access; may be out of date. Linked from the archived page “CPA-accredited programs at PSIs”", u:"http://web.archive.org/web/20230927174555/https://www.cpacanada.ca/-/media/site/operational/ec-education-certification/docs/41037-accredited-psis-en.pdf", f:"references/01-national-core/CPA-Canada-Accredited-PSI-Programs-2023-snapshot.pdf"},
   ON1:{g:"Ontario", org:"CPA Ontario", t:"The New CPA Professional Program", u:"https://www.cpaontario.ca/students/cpa-professional-program"},
@@ -269,7 +269,7 @@ const OLD_MATRIX = [
   on:"Accredited graduate programs can deliver <b>all or part</b> of CPA PEP, but not the CFE. Any modules a program does not offer are completed directly through CPA PEP, and students enrol in the CFE directly with CPA Ontario. [[ON17:e354,ON24:e355]]",
   qc:"<b>Two pathways:</b> the National Program delivered by the Order (online, part time, 12 to 24 months) or a graduate program at one of 11 accredited universities (in class, 24 to 30 credits, 9 to 24 months). [[QC16:e356,QC18:e357]]",
   we:"CPAWSB delivers CPA PEP in Western Canada; the provincial bodies administer the experience requirements. [[W33:e16]]",
-  at:"CPA Atlantic School of Business delivers for NS, NB, NL, PEI and Bermuda. [[A11:e358]]"},
+  at:"CPA Atlantic School of Business delivers for NS, NB, NL and PEI. [[A11:e358]]"},
  {r:"National role", d:0,
   on:"Governed by the profession’s Harmonized Education Policies and national exam blueprints. [[ON17:e359]]",
   qc:"The National Program is “the result of an interprovincial collaboration with CPA Canada”. [[QC16:e360]]",
@@ -305,7 +305,7 @@ const OLD_MATRIX = [
   on:"In person at writing centres across Ontario. [[ON20:e292]]",
   qc:"In person at one examination centre in <b>Montréal</b>; French or English. [[QC17:e294]]",
   we:"Four hours, 9 a.m. to 1 p.m., at 33 primary and secondary locations across the West and the territories. [[W28:e6]]",
-  at:"Centres in each province and Bermuda; Moncton is the only one with full French invigilation. [[A12:e377]]"},
+  at:"Centres in each province; Moncton is the only one with full French invigilation. [[A12:e377]]"},
  {r:"Attempts", d:0,
   on:"Three: a student is deregistered after a third unsuccessful attempt at Core 1, Core 2, Capstone 1, Capstone 2 or the CFE. Students awaiting a third CFE result cannot transition. [[ON20:e901,ON14:e378]]",
   qc:"Three per exam. After a second failure the module must be retaken; after a third the candidate is expelled. [[QC17:e379]]",
@@ -678,7 +678,7 @@ const MATRIX = [
   on:"CPA Ontario regulates. Modules 1–3 are <b>delivered by accredited universities</b>; only CPA Ontario delivers Professional Readiness and the Professional Final Exams. [[ON13:e600,ON2:e601]]",
   qc:"The Order. <b>Two pathways</b>: the program delivered by the Order (online, French or English) or a graduate program at an accredited university. The new licensing regulation was approved Oct 16, 2026 and takes effect Jan 1, 2027. [[QC2:e602,QC5:e603,QC12:e604]]",
   we:"<b>CPAWSB</b> administers the program for BC, AB, SK, MB, YT, NT and NU. Each learner is regulated by their own provincial or territorial body, which also approves the experience plan and the experience completion report. [[W11:e605]]",
-  at:"<b>CPA Atlantic School of Business</b> handles education delivery for CPA Nova Scotia, CPA New Brunswick, CPA Newfoundland and Labrador and CPA Bermuda; its transition policy also covers Prince Edward Island. Its own team reviews experience plans and assesses transition requests. [[A2:e607,A5:e608,A7:e609]]"},
+  at:"<b>CPA Atlantic School of Business</b> handles education delivery for bodies including CPA Nova Scotia, CPA New Brunswick and CPA Newfoundland and Labrador; its transition policy also covers Prince Edward Island. Its own team reviews experience plans and assesses transition requests. [[A2:e607,A5:e608,A7:e609]]"},
  {r:"University route", d:1,
   on:"<b>Online</b> (“Flex”) via Executive Education at Rotman, Waterloo or Ivey, or <b>in person</b> at one of the 17 institutions listed as having applied for accreditation (our count; master’s degree or graduate diploma). In-person graduates are exempt through the Module 1 exam and enter at Exam 1; online students still write CPA Ontario’s Module 1 exam. [[ON2:e610,ON13:e611]]",
   qc:"<b>11 accredited universities</b>, 24–30 credits, 9–24 months. Concordia starts January 2027; HEC, Laval, McGill and UQAM (full time) summer 2027; Sherbrooke and UQO fall 2027. Candidates then take Professional Readiness and Exam 3 with the Order. [[QC5:e612,QC13:e455]]",
@@ -890,7 +890,7 @@ const CARDS = {
   "<b>Standard or flexible pace</b> (about 20 or 10 hours a week), with a two-day in-person orientation. [[W5:e541,W11:e744]]",
   "<b>65% GPA on the last 60 credits</b>; eight-year experience route for applicants without a degree. [[W11:e745]]",
   "<b>Up to two extra years on transition.</b> One set of policies covers all four provinces and the territories. [[W12:e231,W11:e893]]"]},
- at:{h:"Atlantic and Bermuda", who:"CPA Atlantic School of Business with CPA NS, NB, NL, PEI and Bermuda", li:[
+ at:{h:"Atlantic", who:"CPA Atlantic School of Business with CPA NS, NB, NL and PEI", li:[
   "<b>Same calendar and module fees as the West</b>; first modules May 15, 2027, registration from January 2027. [[A2:e747]]",
   "<b>Only region with an official total:</b> about $16,800 + HST for the program over 2.5 years, including a $500 one-time registration fee. [[A2:e748]]",
   "<b>The school approves work plans:</b> a Professional work plan must be approved by the mentor and CPA ASB, and CPA ASB reviews experience before a transition. Under the transition policy, the transition application itself is approved by the relevant Atlantic provincial body. [[A7:e713,A4:e232]]",
@@ -1084,7 +1084,7 @@ const OPEN = [
  ["Quebec fees, rules and the Knowledge Assessment", "As of Nov 18, 2026 the Order’s “Costs, policies and rules” page read “Coming soon”; its page on the program it delivers gave module durations “for information purposes only”; and neither of those pages nor the new-program overview page mentioned a Knowledge Assessment. [[QC8:e853,QC2:e854,QC1:e627]]"],
  ["Western policies are a draft", "The Education and Experience Policies are marked “Draft published May 2026”. The sections on regional transfers, advanced placement for accredited learners and international learners read “To come”, and the Learner Guide is due in early 2027. [[W11:e855]]"],
  ["Summary pages lag the schedules", "CPAWSB’s key-date lists give months (“July 2028” for the last Capstone 2) while its schedule gives Aug 5, 2028; one page says final Core 1 registration closes in early November 2026 while the schedule shows Nov 23. CPA Atlantic’s overview mentions a Core 1 offering in May 2027 where the schedule shows an exam rewrite only. Use the dated schedules. [[W13:e856,W15:e857,W25:e858,A1:e859]]"],
- ["Atlantic details that differ between pages", "The program description mentions a two-day in-person orientation, but the schedule lists the May 15–16, 2027 workshop as online. The new-program page says CPA ASB handles education delivery for CPA Nova Scotia, CPA New Brunswick, CPA Newfoundland and Labrador and CPA Bermuda, without naming Prince Edward Island; the Costs and Fees page names CPA Prince Edward Island as well, and the transition policy and the course lists also cover the province. [[A2:e607,A11:e896,A5:e860,A6:e897]]"],
+ ["Atlantic details that differ between pages", "The program description mentions a two-day in-person orientation, but the schedule lists the May 15–16, 2027 workshop as online. The new-program page names CPA Nova Scotia, CPA New Brunswick and CPA Newfoundland and Labrador among the bodies CPA ASB handles education delivery for, without naming Prince Edward Island; the Costs and Fees page names CPA Prince Edward Island as well, and the transition policy and the course lists also cover the province. [[A2:e607,A11:e896,A5:e860,A6:e897]]"],
  ["Sample exams may be revised", "Sample cases “have not undergone the full range of processes and quality assurance checks”; corrected versions and full Knowledge Assessment and Foundational Development sample exams are due in early 2027. [[ON3:e861,W6:e862]]"],
  ["Western accredited master’s programs", "CPAWSB says the University of Alberta MAcc and the University of Saskatchewan MPAcc will continue with advanced placement, but its policy section on accredited learners still reads “To come”. The University of Alberta says it “will not proceed with a new Master of Accounting intake in Spring 2027”. Saskatchewan’s brochure says students are exempt from the Foundational Development module and exam; no CPAWSB document confirms this or says which version of Exam 1 applies. [[W18:e613,W11:e614,X1:e484,U35:e480]]", true],
  ["Who examines Ontario graduate-program students at the first stage", "Regulation 9-3 exempts in-person graduates from the Foundational Development exam and lets an accredited university deliver an equivalent. University pages describe this differently: some say the exam is bypassed, Waterloo’s MAcc says students “write the Foundational Development examination”, and Queen’s says the assessment is administered by the school. Pages also differ on whether a program delivers CPA Core Common, Licensure or both. [[ON13:e611,U4:e863,U8:e408,U1:e395,U18:e864]]", true],

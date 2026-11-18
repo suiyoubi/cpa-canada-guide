@@ -58,7 +58,7 @@ The same three documents are also published by CPAWSB, the Ordre des CPA du Qué
 | `QC-new-program-structure-EN.png`, `QC-current-program-structure-EN.png` | Structure diagrams | same page |
 | `QC-timeline-order-program-EN.png`, `QC-timeline-university-program-EN.png` | Launch timelines for the two pathways | same page |
 
-## 06-atlantic — CPA Atlantic School of Business (NS, NB, NL, PEI, Bermuda)
+## 06-atlantic — CPA Atlantic School of Business (NS, NB, NL, PEI)
 
 | Save as | What it is | Source |
 |---|---|---|
