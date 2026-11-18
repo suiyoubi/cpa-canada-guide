@@ -6,3 +6,10 @@ __pycache__/
 # source documents are downloaded by each reader (see references/README.md), not redistributed
 references/*
 !references/README.md
+
+# each person's notes stay on the shared drive, not in the repository
+notes/*.json
+
+# downloads made by build/tools/check_evidence.py
+.evidence-cache/
+build/tools/pdf2txt

@@ -5,12 +5,46 @@ const el = (tag, attrs={}, html) => { const e=document.createElement(tag); for(c
 const RK = ["on","qc","we","at"];
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-/* citations: [[A1,B2]] -> superscript links */
+/* citations: a token names the source and, after a colon, the evidence entry that says where in the source
+   the statement is supported. Each chip links straight to that place: a web page opens at the passage
+   (text fragment), a PDF at the page. */
+const EV = typeof EVID === "undefined" ? {} : EVID;
+const attr = x => String(x).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const encT = x => encodeURIComponent(x).replace(/-/g,"%2D");
+function deepLink(i, e){
+  const u = (e && e.u) || SRC[i].u; if(!e) return u;
+  if(e.p) return u.split("#")[0] + "#page=" + e.p;
+  if(e.a) return u + (u.indexOf("#") < 0 ? "#" : "") + ":~:text=" + (e.pre ? encT(e.pre) + "-," : "") + encT(e.a);
+  return u;
+}
+function where(e){ return !e ? "" : (e.p ? "page " + e.p + (e.a ? ", " : "") : "") + (e.a ? "“" + e.a + "”" : "") + (e.fig ? (e.a ? " (in the figure by this text)" : "figure on the page") : ""); }
 function cite(s){
-  return String(s).replace(/\[\[([A-Z0-9, ]+)\]\]/g,(m,ids)=>'<sup class="cite">'+ids.split(",").map(i=>i.trim()).filter(i=>SRC[i]).map(i=>`<a href="#src-${i}"${SRC[i].sec?' class="sec"':""} title="${SRC[i].sec?"Not a CPA body source. ":""}${SRC[i].org}: ${SRC[i].t.replace(/"/g,"&quot;")}">${i}</a>`).join("")+"</sup>");
+  return String(s).replace(/\[\[([A-Za-z0-9:, ]+)\]\]/g,(m,ids)=>'<sup class="cite">'+ids.split(",").map(x=>x.trim().split(":")).filter(x=>SRC[x[0]]).map(x=>{
+    const i = x[0], e = EV[x[1]], s = SRC[i];
+    return `<a href="${attr(deepLink(i,e))}" target="_blank" rel="noopener" data-src="${i}"${e?` data-e="${x[1]}"`:""}${s.sec?' class="sec"':""} title="${attr((s.sec?"Not a CPA body source. ":"")+s.org+": "+s.t+(e?" · "+where(e):""))}">${i}</a>`;
+  }).join("")+"</sup>");
 }
 $$("[data-cite]").forEach(n=>{ n.innerHTML = cite(n.innerHTML); });
-$$("sup.cite a").forEach(a=>{ const s = SRC[a.getAttribute("href").slice(5)]; if(s && s.sec){ a.classList.add("sec"); a.title = "Not a CPA body source. " + s.org; } });
+/* clicking a chip shows what is cited and where, with a link that opens the source at that place */
+const cpop = el("div",{class:"citepop",hidden:"",role:"dialog","aria-label":"Source"}); document.body.appendChild(cpop);
+document.addEventListener("click", e=>{
+  const a = e.target.closest && e.target.closest("sup.cite a[data-src]");
+  if(!a){ if(!cpop.hidden && !cpop.contains(e.target)) cpop.hidden = true; return; }
+  if(e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  e.preventDefault(); e.stopPropagation();
+  const i = a.dataset.src, s = SRC[i], ev = EV[a.dataset.e];
+  cpop.innerHTML = `<div class="cp-h"><span class="id">${i}</span><span>${attr(s.org)}</span><button type="button" class="cp-x" aria-label="Close">×</button></div><div class="cp-t">${attr(s.t)}</div>`+
+    (ev ? `<div class="cp-q">${ev.p?`<b>Page ${ev.p}</b>`:""}${ev.a?`<q>${attr(ev.a)}</q>`:""}${ev.fig?`<i>${ev.a?"The detail is in the figure by this text.":"The detail is in a figure on the page."}</i>`:""}</div>` : `<div class="cp-q"><i>No passage recorded for this citation.</i></div>`)+
+    (s.sec ? `<div class="cp-n">Not a CPA body source.</div>` : "")+
+    `<div class="cp-a"><a class="btn primary" href="${attr(a.getAttribute("href"))}" target="_blank" rel="noopener">${ev&&ev.p?"Open the PDF at this page":ev&&ev.a?"Open the source at this passage":"Open the source"} ↗</a><a class="btn" href="#src-${i}">In the source list</a></div>`;
+  cpop.hidden = false;
+  const r = a.getBoundingClientRect(), w = cpop.offsetWidth, h = cpop.offsetHeight;
+  cpop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
+  cpop.style.top = (r.bottom + h + 12 > window.innerHeight ? Math.max(8, r.top - h - 8) : r.bottom + 8) + "px";
+}, true);
+cpop.addEventListener("click", e=>{ if(e.target.closest(".cp-x, .cp-a a")) cpop.hidden = true; });
+document.addEventListener("keydown", e=>{ if(e.key === "Escape") cpop.hidden = true; });
+window.addEventListener("scroll", ()=>{ cpop.hidden = true; }, {passive:true});
 
 /* tooltip */
 const tip = el("div",{class:"tip",hidden:""}); document.body.appendChild(tip);
@@ -331,14 +365,14 @@ mountTimeline({host:"#tl", regs:"#tlRegs", note:"#tlNote", note2:"#tlNote2", leg
     const r=sReg.value, s=SITS.find(x=>x.id===sSit.value), lic=sLic.value==="y";
     let ex = s.x.slice(); const notes=[];
     if(lic){
-      if(s.new) notes.push("For a public accounting licence choose <b>CPA Core – Licensure</b> and write the Licensure version of Final Exam 1; the 24 months of experience must be in a firm approved for it. [[N2,W11,ON5]]");
-      if(s.lic==="core"){ ex = ex.filter(c=>c!=="CORE"); notes.push(r==="qc" ? "Because you are aiming for the CPA auditor designation, you must complete the Core module in the <b>Common + Public accountancy</b> path unless both Assurance and Taxation electives are passed. [[QC7]]" : "Because you want a public accounting licence, the exemption does not cover <b>CPA Core – Licensure</b>: you must complete that module and write the Licensure version of Final Exam 1. [[W12,W15,A1,ON14]]"); }
-      if(s.lic==="maybe") notes.push("Whether you are exempt from the Common or the Licensure version of CPA Core depends on the electives you completed (Tax and Assurance for Licensure). [[W12]]");
-      if(s.id==="d23"){ notes.push("The exemption from CPA Core – Licensure and Final Exam 1 applies if the CFE was passed in the Assurance role with depth in Financial Reporting and the Tax and Assurance electives are complete; otherwise the Licensure module and exam are still needed for a licence. [[W12]]"); }
-      if(s.id==="e2ta") notes.push("Write the <b>Licensure</b> version of Final Exam 1. [[W12]]");
+      if(s.new) notes.push("For a public accounting licence choose <b>CPA Core – Licensure</b> and write the Licensure version of Final Exam 1; the 24 months of experience must be in a firm approved for it. [[N2:e124,W11:e258,ON5:e869]]");
+      if(s.lic==="core"){ if(!(r==="qc" && s.id==="e2o")) ex = ex.filter(c=>c!=="CORE");   /* Quebec, two electives passed: the Order exempts the Core module itself */ notes.push(r==="qc" ? "Because you are aiming for the CPA auditor designation: with one elective passed, you must start at the Core module in the <b>Common + Public accountancy</b> path. With two electives passed, the Order’s transition page says you do not take the Core module but must still pass its exam. In both cases it asks you to confirm your transition plan with the Order. [[QC7:e870]]" : "Because you want a public accounting licence, the exemption does not cover <b>CPA Core – Licensure</b>: you must complete that module and write the Licensure version of Final Exam 1. [[W12:e871,W15:e806,A1:e872,ON14:e873]]"); }
+      if(s.lic==="maybe") notes.push("Whether you are exempt from the Common or the Licensure version of CPA Core depends on the electives you completed (Tax and Assurance for Licensure). [[W12:e874]]");
+      if(s.id==="d23"){ notes.push("The exemption from CPA Core – Licensure and Final Exam 1 applies if the CFE was passed in the Assurance role with depth in Financial Reporting and the Tax and Assurance electives are complete; otherwise the Licensure module and exam are still needed for a licence. [[W12:e875]]"); }
+      if(s.id==="e2ta") notes.push("Write the <b>Licensure</b> version of Final Exam 1. [[W12:e876]]");
     }
-    if(r==="qc" && s.new) notes.push("Quebec: entry is through a bachelor’s degree recognized by the Order or its equivalence process; the Order’s pages do not describe a Knowledge Assessment route. Choose between the Order’s program and a university graduate program. [[QC1,QC2,QC5]]");
-    if(r==="on" && s.new) notes.push("Ontario: choose an online partner university (Rotman, Waterloo, Ivey) or an in-person accredited program; you stay with one provider for the education modules. [[ON2]]");
+    if(r==="qc" && s.new) notes.push("Quebec: entry is through a bachelor’s degree recognized by the Order or its equivalence process; as of Nov 18, 2026 the Order’s pages cited here did not describe a Knowledge Assessment route. Choose between the Order’s program and a university graduate program. [[QC1:e627,QC2:e602,QC5:e603]]");
+    if(r==="on" && s.new) notes.push("Ontario: choose an online partner university (Rotman, Waterloo, Ivey) or an in-person accredited program; you stay with one provider for the education modules. [[ON2:e877]]");
     const req = ORDER.filter(c=>!ex.includes(c));
     const start = req[0];
     const title = !req.length ? "Education and exams complete" : `Start at: ${NAMES[start]}`;
@@ -349,7 +383,7 @@ mountTimeline({host:"#tl", regs:"#tlRegs", note:"#tlNote", note2:"#tlNote2", leg
       ${notes.length?`<ul>${notes.map(n=>`<li>${cite(n)}</li>`).join("")}</ul>`:""}
       ${req.length?`<div><h4 style="font-size:14px;margin-bottom:6px">Earliest published dates for what remains</h4><ul>${dates}</ul><p class="foot">${cite(`First offerings as published. [[${FIRST[r].src}]]`)} All experience must be complete before Professional Readiness.</p></div>`:""}
       ${s.new?"":`<div class="note soft">${cite(REG_TX[r])}</div>`}
-      <p class="foot">This tool restates the published placement tables. Placement is confirmed only by the provincial or regional body when a transition or admission is approved.</p>`;
+      <p class="foot">${cite(`This tool restates the published placement tables. In the West, candidates receive confirmation of their placement during the Transition Application; in Atlantic, a transition is not confirmed until the provincial body approves it; in Quebec, candidates must confirm their transition plan with the Order; in Ontario, CPA Ontario transitions students itself. [[W12:e936,A4:e729,QC7:e727,ON14:e884]]`)}</p>`;
   }
   [sReg,sSit,sLic].forEach(s=>s.addEventListener("change",render));
   render();
@@ -364,7 +398,7 @@ mountTimeline({host:"#tl", regs:"#tlRegs", note:"#tlNote", note2:"#tlNote2", leg
 /* ---------- universities: who can deliver what ---------- */
 function mountCover(id, COLS, ROWS){
   const host = $(id); if(!host) return;
-  const KEY = {u:["University","cv-u"], b:["CPA body","cv-b"], e:["Either","cv-e"], x:["Not applicable","cv-x"]};
+  const KEY = {u:["University","cv-u"], b:["CPA body","cv-b"], e:["Either","cv-e"], x:["To come","cv-x"]};
   let h = `<table class="cover"><thead><tr><th scope="col">Region</th>${COLS.map(c=>`<th scope="col" class="${c[1]==="e"?"ex":""}">${c[0]}</th>`).join("")}</tr></thead><tbody>`;
   ROWS.forEach(r=>{ h += `<tr><th scope="row"><span class="rg ${r.r}">${REG[r.r].name}</span>${r.sub?`<small>${r.sub}</small>`:""}</th>${r.c.map(v=>{ const k = KEY[v[0]]; return `<td class="${k[1]}" tabindex="0" data-t="${(v[1]||"").replace(/"/g,"&quot;")}"><b>${k[0]}</b>${v[2]?`<small>${v[2]}</small>`:""}</td>`; }).join("")}</tr>`; });
   host.innerHTML = h + "</tbody></table>";
@@ -421,24 +455,27 @@ function mountPaths(id, LIST){
 }
 mountPaths("#opaths", OLD_PATHS);
 mountPaths("#paths", NEW_PATHS);
-[["#ocoverNote","Module coverage for Ontario, the West and Atlantic follows CPA Canada’s national list of accredited programs (a 2023 snapshot); Quebec follows the Order. Graduate diplomas typically cover Core 1, Core 2 and two electives, and the longer master’s programs add the Capstones. Hover or focus a cell for detail. [[N4,ON24,QC18,W21]]"],
- ["#coverNote","Ontario from Regulation 9-3; Quebec from the Order; West from the draft policies, where the section on advanced placement for accredited learners reads “To come”; Atlantic from CPA Atlantic’s program pages. Hover or focus a cell for detail. [[ON13,QC1,QC3,W11,W18,A2]]"],
- ["#ouniNote","Where a university’s current pages no longer describe the old program, coverage comes from CPA Canada’s 2023 list. Check with the university before relying on a row. [[N4]]"],
- ["#uniNote","In Ontario, in-person graduates are exempt through the Foundational Development exam and enter at Exam 1, while online students still write CPA Ontario’s module exam. Every graduate, in every region, still takes Professional Readiness and Exam 3 with the CPA body. [[ON13,ON2,QC3]]"],
- ["#opathsNote","Illustrations only. Module coverage and program lengths are from the cited sources; the month-by-month layout and the experience end dates are our arithmetic."],
- ["#pathsNote","Illustrations only. Exam sittings follow the published September, January and May pattern; Professional Readiness is placed at the first offering after the 24 months are complete, which is our arithmetic. [[W7,ON4]]"]
+[["#ocoverNote","Module coverage for Ontario, the West and Atlantic follows CPA Canada’s national list of accredited programs (a 2023 snapshot); Quebec follows the Order. Outside Quebec, the graduate diploma rows on that list cover Core 1, Core 2 and two electives, and only master’s rows add Capstone 1 or both Capstones (our reading of the list). Hover or focus a cell for detail. [[N4:e878,ON24:e879,QC18:e880]] Prerequisite routes are from each body’s own pages: a recognized institution or the body’s preparatory courses in Ontario, the West and Atlantic, and the recognized bachelor’s degree in Quebec. [[ON19:e178,W27:e275,A11:e365,A14:e186,QC23:e898]] Lakehead and York say on their own pages that their diplomas cover all four electives. [[U31:e443,U16:e419]] For the West and Atlantic, the Capstone 2 and CFE cells also follow CPAWSB’s CFE page and CPA Atlantic’s CPA PEP page. [[W21:e376,A10:e910]]"],
+ ["#coverNote","Ontario from Regulation 9-3 and CPA Ontario’s entry requirements. [[ON13:e881,ON9:e795]] Quebec from the Order. [[QC1:e175,QC3:e510,QC2:e602,QC5:e603]] West: CPAWSB says accredited programs “deliver part of the CPA Professional Program” and that their students “will receive advanced placement”, and its draft policies define an accredited program as excluding the Professional Final Exams. [[W20:e944,W18:e613,W11:e177]] Cells marked “To come” quote the draft policies’ section on advanced placement for accredited learners, which reads “To come”. [[W11:e614]] West qualifying courses and the Professional Readiness workshop are from CPAWSB’s pages. [[W18:e945,W19:e734,W5:e579]] Atlantic from CPA Atlantic’s program pages. [[A2:e504]] Hover or focus a cell for detail."],
+ ["#ouniNote","Where a university’s current pages no longer describe the old program, coverage comes from CPA Canada’s 2023 list. Check with the university before relying on a row. [[N4:e882]]"],
+ ["#uniNote","In Ontario, in-person graduates are exempt through the Foundational Development exam and enter at Exam 1, while online students still write CPA Ontario’s module exam. In Ontario and Quebec, every graduate still takes Professional Readiness and Exam 3 with the CPA body. [[ON13:e611,ON2:e601,QC3:e510,QC1:e175]]"],
+ ["#opathsNote","Illustrations only. Module coverage and program lengths are from the cited sources. The CFE is a three-day examination, and the work bars run for the required practical experience: 30 months, or 24 in Quebec. [[W21:e29,W24:e9,QC9:e10]] The month-by-month layout and the experience end dates are our arithmetic."],
+ ["#pathsNote","Illustrations only. Exam sittings follow the published September, January and May pattern. The end of each work bar, and the placing of Professional Readiness at the first offering after the 24 months are complete, are our arithmetic. [[W7:e251,ON4:e113,A3:e112,W18:e949]]"]
 ].forEach(function(r){ var n = $(r[0]); if(n) n.innerHTML = cite(r[1]); });
 
 /* ---------- references ---------- */
 (function(){
   const host = $("#refs"); if(!host) return;
-  const groups = {};
+  const groups = {}, passages = {};
   Object.keys(SRC).forEach(id=>{ const s=SRC[id]; (groups[s.g]=groups[s.g]||[]).push([id,s]); });
+  Object.keys(EV).forEach(k=>{ const e = EV[k]; (passages[e.s] = passages[e.s] || []).push(e); });
   ["National program documents","Ontario","Quebec","West","Atlantic","University pages","Secondary sources"].forEach(g=>{
     if(!groups[g]) return;
     host.appendChild(el("h3",{},g+(g==="Secondary sources"||g==="University pages"?" (not official CPA documentation)":"")));
     groups[g].forEach(([id,s])=>{
-      host.appendChild(el("div",{class:"ref"+(s.sec?" secondary":""),id:"src-"+id},`<span class="id">${id}</span><span class="ti">${s.org}. <a href="${s.u}" target="_blank" rel="noopener">${s.t}</a></span><span class="mt">${s.sec?(s.g==="University pages"?"UNIVERSITY PAGE, NOT A CPA SOURCE · ":"SECONDARY SOURCE · "):"Official · "}${s.up?s.up+" · ":""}accessed ${ACCESSED}${s.f?` · <a href="${s.f}">local copy</a>`:""}<br>${s.u}</span>`));
+      const list = (passages[id]||[]).slice().sort((a,b)=>(a.p||0)-(b.p||0));
+      host.appendChild(el("div",{class:"ref"+(s.sec?" secondary":""),id:"src-"+id},`<span class="id">${id}</span><span class="ti">${s.org}. <a href="${s.u}" target="_blank" rel="noopener">${s.t}</a></span><span class="mt">${s.sec?(s.g==="University pages"?"UNIVERSITY PAGE, NOT A CPA SOURCE · ":"SECONDARY SOURCE · "):"Official · "}${s.up?s.up+" · ":""}accessed ${ACCESSED}${s.f?` · <a href="${s.f}">local copy</a>`:""}<br>${s.u}</span>`+
+        (list.length ? `<details class="psg"><summary>${list.length} cited passage${list.length>1?"s":""}</summary><ul>${list.map(e=>`<li><a href="${attr(deepLink(id,e))}" target="_blank" rel="noopener">${e.p?"p. "+e.p:(e.fig&&!e.a?"figure":"open")}</a>${e.a?" “"+attr(e.a)+"”":""}${e.fig?" (figure)":""}</li>`).join("")}</ul></details>` : "")));
     });
   });
 })();

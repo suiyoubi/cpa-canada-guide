@@ -9,7 +9,36 @@ A study and program-management guide to Canada's CPA certification: the current 
 | `CPA-Professional-Program-Guide.html` | **Main guide.** Interactive, with note-taking. Open in Chrome or Edge on a computer. This is the file to work on. |
 | `CPA-Professional-Program-Guide-Phone.html` | Reading copy for phones. No scripts; everything is written into the page. Generated from the main guide, never edited by hand. |
 | `references/README.md` | Download links for the official source documents. The documents are not stored here; see that page for where to get them and where to save them. |
+| `notes/` | Where each person's notes are saved when a team shares the guide from a shared drive. See "Sharing with a team" below. |
 | `build/` | The sources both HTML files are generated from, and the build script. |
+| `AUDIT-2026-11-18.md` | Record of the reference audit: what was checked, what was found, and every change made. |
+
+## References
+
+Every statement carries a citation code, and every citation records where in its source the statement is supported: a short locating phrase copied from the source and, for PDFs, the page number. These live in `build/evidence.js`.
+
+- In the guide, select a citation code to see the source, the phrase and the page, with a button that opens a web source at that passage or a PDF at that page. The Sources section lists every passage cited from each source.
+- In the sources (`build/body.html`, `build/data.js`), a citation is written `[[ON14:e12,W13:e13]]`: source id, colon, evidence id. The build reports any citation that has no evidence entry; there should be none.
+- To check all citations against the live sources again: `python3 build/tools/check_evidence.py`. It reports any phrase that is no longer on its page and any PDF page number that has moved.
+
+Rule for new content: no statement without a source, and no citation without a located passage. Chart labels and tooltips cannot hold a citation, so their sources go in the chart's caption.
+
+## Sharing with a team
+
+No server is needed, only a folder everyone can read and write (a network drive, or a folder synced by OneDrive, SharePoint or Google Drive).
+
+1. Copy `CPA-Professional-Program-Guide.html` and the `notes/` folder to the shared folder.
+2. Each person opens the guide from that folder in **Chrome or Edge on a computer**. The guide looks for a `notes` folder next to itself:
+   - **Found:** a prompt beside the Notes button offers **Connect**. The browser then asks the person to choose a folder; they pick the one that holds the guide, and the guide uses the `notes` folder inside it. A browser never lets a page open a folder by itself, so this one pick cannot be skipped. It is asked once per copy of the guide; later visits reconnect by themselves or with one click on **Reconnect**.
+   - **Not found:** the Notes panel says so and asks whether to create the folder there or use one kept elsewhere.
+   - The person then enters the name others should see.
+3. Select text in the guide and choose **Note** or **Suggest wording**. Everyone's notes appear together, each marked with its author. Others can reply, resolve a note, or accept or reject a suggestion.
+
+How it stays safe with several people: each person's browser writes only that person's own file in `notes/` and reads everyone else's, checking again every 20 seconds. Nobody writes the guide itself, so replacing it with a rebuilt version loses no notes.
+
+Accepted wording suggestions do not rewrite the guide on the spot. An accepted change stays marked in the text for everyone (original struck through, new wording with a tick) and is counted as "accepted, awaiting rebuild". **Accepted changes** in the Notes panel exports the ones still waiting; apply them to the sources in `build/`, rebuild, and replace the shared file. Once the rebuilt guide contains the new wording, the suggestion closes by itself as "now in the guide".
+
+Limits: there is no login, so names are on trust. Safari, Firefox and phones cannot write to a folder; there, **Import** opens other people's files read-only. The guide must be opened from the drive as a file, not inside a SharePoint or Drive web page.
 
 ## Rebuilding
 
@@ -33,11 +62,12 @@ Done:
 - Part A, current program; Part B, new program; transition rules, pathway finder, planning notes, old-versus-new comparison, open items, 140 cited sources.
 - "Universities" sections for both programs: what a university can deliver by region, programs with links, generic example pathways.
 - Note-taking in the main guide (notes stored in the browser and saved into the file).
+- Shared notes for a team: per-person files in `notes/`, replies, resolve, wording suggestions with accept and reject, export of accepted changes. Tested in Chrome against a simulated folder with several people; not yet tried on a real shared drive, with the browser's folder picker, or in Edge.
 - Separate script-free phone copy.
+- Reference audit (Nov 18, 2026): all 1,190 citations checked against their sources, 152 statements corrected, every citation now a deep link to the passage or PDF page. See `AUDIT-2026-11-18.md`.
 
 Not done:
 
-- **Shared notes for a team.** Designed, not built: the guide stays read-only on a shared drive and each person's notes and wording suggestions go into their own file in a `notes/` folder, merged by the page on load. Needs Chrome or Edge on a computer.
 - Several facts were still unpublished or inconsistent at the source; they are listed in the guide's "Open items" section.
 
 ## Sources and copyright

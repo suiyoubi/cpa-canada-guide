@@ -11,7 +11,7 @@
     if (emptyInSource && live.innerHTML.trim() !== "") {
       const c = live.cloneNode(true);
       c.querySelectorAll("mark.nt-hl").forEach(m => m.replaceWith(...m.childNodes));   // drop note highlights
-      c.querySelectorAll(".nt-ui").forEach(n => n.remove());
+      c.querySelectorAll(".nt-ui, ins.nt-ins").forEach(n => n.remove());
       c.normalize();
       blocks[s.id] = c.innerHTML;
     } else if (!emptyInSource && s.innerHTML !== live.innerHTML) changed.push(s.id);
