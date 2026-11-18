@@ -1,0 +1,8 @@
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
+
+# source documents are downloaded by each reader (see references/README.md), not redistributed
+references/*
+!references/README.md
