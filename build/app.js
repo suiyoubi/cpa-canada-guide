@@ -478,11 +478,11 @@ mountPaths("#paths", NEW_PATHS);
 const RS = typeof RESEARCH !== "undefined" ? RESEARCH : {};
 $$(".sumx[data-sum]").forEach(host=>{
   const T = RS.sum && RS.sum[host.dataset.sum]; if(!T) return; const k = host.id;
-  host.innerHTML = (T.lede && !host.dataset.nolede ? `<p class="lede">${cite(T.lede)}</p>` : "") +
+  host.innerHTML = (T.lede && host.dataset.nolede !== "1" && host.dataset.nolede !== "0" ? `<p class="lede">${cite(T.lede)}</p>` : "") +
     `<div class="toolbar"><span class="lab">Show</span><div class="seg" id="${k}-regs">${RK.map(r=>`<button type="button" data-r="${r}" aria-pressed="true" style="--c:var(--${r})"><span class="sw"></span>${REG[r].name}</button>`).join("")}</div><label><input type="checkbox" id="${k}-diff"> Only rows where regions differ</label></div>
      <div class="frame scroll" style="max-height:78vh;overflow-y:auto"><table class="cmp" id="${k}-t"></table></div><p class="foot" id="${k}-n"></p>`;
   const OP = (RS[host.dataset.topic]||{}).open || [];
-  if(OP.length && !host.dataset.nolede) host.insertAdjacentHTML("beforeend", `<details class="fopen"><summary><span class="openlab">[OPEN – ${OP.length} point${OP.length>1?"s":""} not yet settled by the sources, as of ${ACCESSED}]</span></summary><ul>${OP.map(o=>`<li>${o[0]!=="all"&&REG[o[0]]?`<span class="rg ${o[0]}">${REG[o[0]].name}</span> `:""}${o[1]}</li>`).join("")}</ul></details>`);
+  if(OP.length && host.dataset.nolede !== "1") host.insertAdjacentHTML("beforeend", `<details class="fopen"><summary><span class="openlab">[OPEN – ${OP.length} point${OP.length>1?"s":""} not yet settled by the sources, as of ${ACCESSED}]</span></summary><ul>${OP.map(o=>`<li>${o[0]!=="all"&&REG[o[0]]?`<span class="rg ${o[0]}">${REG[o[0]].name}</span> `:""}${o[1]}</li>`).join("")}</ul></details>`);
   mountMatrix("#"+k+"-t", "#"+k+"-diff", "#"+k+"-regs", T.rows);
   const n = T.rows.filter(r=>r.r).length, dn = T.rows.filter(r=>r.d).length;
   $("#"+k+"-n").textContent = `${n} topics; ${dn} differ between regions. Italic grey cells mark what the sources checked did not state.`;
@@ -504,6 +504,17 @@ $$(".sumx[data-sum]").forEach(host=>{
 (function(){
   const host = $("#provcards"), P = RS.providers; if(!host || !P) return;
   host.innerHTML = (P.lede ? `<p class="prose" style="margin-bottom:12px">${cite(P.lede)}</p>` : "") + `<div class="pgrid">${P.list.map(p=>`<article class="pcard"><h4>${attr(p.name)}</h4>${p.what?`<p class="pw">${cite(p.what)}</p>`:""}<dl>${[["new","New program"],["current","Current program"],["note","Also"]].filter(x=>p[x[0]]).map(x=>`<dt>${x[1]}</dt><dd>${cite(p[x[0]])}</dd>`).join("")}</dl></article>`).join("")}</div>`;
+})();
+(function(){
+  const host = $("#qlist"), Q = RS.questions; if(!host || !Q) return; let region = "all";
+  const item = x => `<li>${REG[x[0]] ? `<span class="rg ${x[0]}">${REG[x[0]].name}</span>` : `<span class="rg">Every body</span>`} ${x[1]}${x[2] ? ` <small>${x[2]}</small>` : ""}</li>`;
+  function draw(){
+    const f = l => l.filter(x=>region === "all" || x[0] === region || x[0] === "all");
+    host.innerHTML = Q.map(t=>{ const p = f(t.priority), o = f(t.other); if(!p.length && !o.length) return "";
+      return `<div class="qtype"><h4>${t.type}</h4>${p.length ? `<p class="qlab">Priority</p><ul>${p.map(item).join("")}</ul>` : ""}${o.length ? `<details><summary>${o.length} other follow-up question${o.length>1?"s":""}</summary><ul>${o.map(item).join("")}</ul></details>` : ""}</div>`; }).join("") || `<p class="foot">No questions for this body.</p>`;
+  }
+  $$("#qRegs button").forEach(b=>b.addEventListener("click",()=>{ region = b.dataset.r; $$("#qRegs button").forEach(o=>o.setAttribute("aria-pressed", String(o===b))); draw(); }));
+  draw();
 })();
 (function(){
   const host = $("#recip"), G = RS.recip; if(!host || !G) return;
