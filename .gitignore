@@ -7,8 +7,10 @@ __pycache__/
 references/*
 !references/README.md
 
-# each person's notes stay on the shared drive, not in the repository
-notes/*.json
+# people's notes are never pushed; only the folder's README and marker file are kept in the repository
+notes/*
+!notes/README.md
+!notes/folder.js
 
 # downloads made by build/tools/check_evidence.py
 .evidence-cache/

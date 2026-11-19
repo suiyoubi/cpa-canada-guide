@@ -1,6 +1,7 @@
 import re, sys, pathlib
 src = pathlib.Path(sys.argv[1]); out = pathlib.Path(sys.argv[2])
 css = (src/'style.css').read_text(); body=(src/'body.html').read_text(); data=(src/'data.js').read_text(); app=(src/'app.js').read_text()
+if (src/'research.js').exists(): data += '\n' + (src/'research.js').read_text()
 notes_js=(src/'notes.js').read_text()
 # keep any notes the reader has already saved into the existing file
 saved='[]'

@@ -167,6 +167,13 @@ mountHours("#examHours", EXAMS);
 })();
 
 /* ---------- comparison matrix ---------- */
+/* A pending item is shown as a short red label: [OPEN – what is not yet listed]. */
+function openText(t){
+  let s = String(t).replace(/\[\[[^\]]*\]\]/g, "").replace(/<[^>]+>/g, "").replace(/^As of [A-Z][a-z]+ \d+, \d{4},? ?/, "").replace(/\.\s*$/, "").trim();
+  if(/^Not stated in the sources checked$/i.test(s)) s = "not stated by this body";
+  if(s.length > 110) s = s.slice(0, 107).replace(/\s+\S*$/, "") + "…";
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
 function mountMatrix(tId, diffId, regsId, MATRIX){
   const t = $(tId); if(!t) return;
   let onlyDiff = false; const vis = {on:true,qc:true,we:true,at:true};
@@ -179,7 +186,7 @@ function mountMatrix(tId, diffId, regsId, MATRIX){
       if(onlyDiff && !row.d) return;
       if(pending){ h+=pending; pending=null; }
       any=true;
-      h += `<tr class="${row.d?"diff":"same"}"><th scope="row"><span>${row.r}</span></th>${cols.map(r=>{ const v=row[r]; return (v&&v.tbd)?`<td class="tbd">${cite(v.t)}</td>`:`<td>${cite(v)}</td>`; }).join("")}</tr>`;
+      h += `<tr class="${row.d?"diff":"same"}"><th scope="row"><span>${row.r}</span></th>${cols.map(r=>{ const v=row[r]; return (v&&v.tbd)?(tId==="#ocmp"?`<td class="tbd">${cite(v.t)}</td>`:`<td class="tbd"><span class="openlab">[OPEN – ${openText(v.t)}]</span></td>`):`<td>${cite(v)}</td>`; }).join("")}</tr>`;
     });
     t.innerHTML = h+"</tbody>";
     t.style.minWidth = (220 + cols.length*200)+"px";
@@ -257,6 +264,11 @@ function mountTimeline(cfg){
         svg.appendChild(S("rect",{x:xa,y:cy-7,width:w,height:14,rx:4,fill:fill,stroke:r.kind==="win"?"var(--hl-ink)":"var(--surface)","stroke-width":r.kind==="win"?0.75:2,class:"o"}));
         if(((r.kind==="new" && !r.sess) || (OLD && r.kind==="old")) && i===0 && xa-L>44) svg.appendChild(S("text",{x:xa-5,y:cy+4,"text-anchor":"end",class:"lbl"},fmtS(b[0])));
         if(r.kind==="win") svg.appendChild(S("text",{x:(xa+xa+w)/2,y:cy+4,"text-anchor":"middle",class:"lbl",style:"fill:var(--hl-ink);font-weight:600"},"Jan 1, 2027 to Dec 31, 2028"));
+        if(r.kind==="new" && !r.sess && region!=="on"){            /* the exam that follows this offering */
+          const ex = S("rect",{x:xb-4.5,y:cy-4.5,width:9,height:9,transform:`rotate(45 ${xb} ${cy})`,fill:"var(--ink)",stroke:"var(--surface)","stroke-width":1.5,class:"o"});
+          const eh = S("rect",{x:xb-9,y:r.y,width:18,height:rh,class:"hit",tabindex:"0"}); bindTip(eh, r.n + ": exam", `${fmt(b[1])} · module starts ${fmt(b[0])}`);
+          svg.appendChild(ex); svg.appendChild(eh);
+        }
       });
       (r.soft||[]).forEach(b=>{
         const xa=x(D(b[0])), xb=x(D(b[1]));
@@ -461,6 +473,77 @@ mountPaths("#paths", NEW_PATHS);
  ["#opathsNote","Illustrations only. Module coverage and program lengths are from the cited sources. The CFE is a three-day examination, and the work bars run for the required practical experience: 30 months, or 24 in Quebec. [[W21:e29,W24:e9,QC9:e10]] The month-by-month layout and the experience end dates are our arithmetic."],
  ["#pathsNote","Illustrations only. Exam sittings follow the published September, January and May pattern. The end of each work bar, and the placing of Professional Readiness at the first offering after the 24 months are complete, are our arithmetic. [[W7:e251,ON4:e113,A3:e112,W18:e949]]"]
 ].forEach(function(r){ var n = $(r[0]); if(n) n.innerHTML = cite(r[1]); });
+
+/* ---------- summaries of the researched findings ---------- */
+const RS = typeof RESEARCH !== "undefined" ? RESEARCH : {};
+$$(".sumx[data-sum]").forEach(host=>{
+  const T = RS.sum && RS.sum[host.dataset.sum]; if(!T) return; const k = host.id;
+  host.innerHTML = (T.lede && !host.dataset.nolede ? `<p class="lede">${cite(T.lede)}</p>` : "") +
+    `<div class="toolbar"><span class="lab">Show</span><div class="seg" id="${k}-regs">${RK.map(r=>`<button type="button" data-r="${r}" aria-pressed="true" style="--c:var(--${r})"><span class="sw"></span>${REG[r].name}</button>`).join("")}</div><label><input type="checkbox" id="${k}-diff"> Only rows where regions differ</label></div>
+     <div class="frame scroll" style="max-height:78vh;overflow-y:auto"><table class="cmp" id="${k}-t"></table></div><p class="foot" id="${k}-n"></p>`;
+  const OP = (RS[host.dataset.topic]||{}).open || [];
+  if(OP.length && !host.dataset.nolede) host.insertAdjacentHTML("beforeend", `<details class="fopen"><summary><span class="openlab">[OPEN – ${OP.length} point${OP.length>1?"s":""} not yet settled by the sources, as of ${ACCESSED}]</span></summary><ul>${OP.map(o=>`<li>${o[0]!=="all"&&REG[o[0]]?`<span class="rg ${o[0]}">${REG[o[0]].name}</span> `:""}${o[1]}</li>`).join("")}</ul></details>`);
+  mountMatrix("#"+k+"-t", "#"+k+"-diff", "#"+k+"-regs", T.rows);
+  const n = T.rows.filter(r=>r.r).length, dn = T.rows.filter(r=>r.d).length;
+  $("#"+k+"-n").textContent = `${n} topics; ${dn} differ between regions. Italic grey cells mark what the sources checked did not state.`;
+});
+(function(){
+  const host = $("#schedgrid"), G = RS.schedules && RS.schedules.grid; if(!host || !G) return;
+  let region = "we";
+  host.innerHTML = `<div class="toolbar"><span class="lab">Region</span><div class="seg">${["we","at"].map(r=>`<button type="button" data-r="${r}" aria-pressed="${r===region}" style="--c:var(--${r})"><span class="sw"></span>${REG[r].name}</button>`).join("")}</div><span class="openlab">[OPEN – Ontario: dated module table not yet listed]</span><span class="openlab">[OPEN – Quebec: dated module table not yet listed]</span></div><div class="frame scroll" style="max-height:78vh;overflow-y:auto"><table class="tbl sgrid"><thead><tr><th>Track</th><th>Offering</th><th>Registration opens</th><th>Module starts</th><th>Workshop</th><th>Exam</th></tr></thead><tbody></tbody></table></div>`;
+  const tb = $("tbody", host);
+  function draw(){
+    let h = "", last = null;
+    G[region].forEach(r=>{ if(r[0] !== last){ last = r[0]; h += `<tr class="grp"><th colspan="6">${r[0]}</th></tr>`; }
+      h += `<tr><td>${r[1]}</td><th scope="row" class="mono">${r[2]}</th>${[3,4,5,6].map(i=>`<td>${r[i] ? (/^TBD\b/.test(r[i]) ? cite(r[i].replace(/^TBD/, '<span class="openlab">[OPEN – not yet listed]</span>')) : cite(r[i])) : "—"}</td>`).join("")}</tr>`; });
+    tb.innerHTML = h;
+  }
+  $$(".seg button", host).forEach(b=>b.addEventListener("click",()=>{ region = b.dataset.r; $$(".seg button", host).forEach(o=>o.setAttribute("aria-pressed", String(o===b))); draw(); }));
+  draw();
+})();
+(function(){
+  const host = $("#provcards"), P = RS.providers; if(!host || !P) return;
+  host.innerHTML = (P.lede ? `<p class="prose" style="margin-bottom:12px">${cite(P.lede)}</p>` : "") + `<div class="pgrid">${P.list.map(p=>`<article class="pcard"><h4>${attr(p.name)}</h4>${p.what?`<p class="pw">${cite(p.what)}</p>`:""}<dl>${[["new","New program"],["current","Current program"],["note","Also"]].filter(x=>p[x[0]]).map(x=>`<dt>${x[1]}</dt><dd>${cite(p[x[0]])}</dd>`).join("")}</dl></article>`).join("")}</div>`;
+})();
+(function(){
+  const host = $("#recip"), G = RS.recip; if(!host || !G) return;
+  const TITLES = ["How each body names its categories", "Admitted without a further qualifying examination (mutual recognition, reciprocal membership, recognized bodies, Quebec’s agreements)", "Examinations still required (memorandum of understanding)", "All other bodies"];
+  const bullets = t => { const m = t.match(/^(.*?)(\s*\[\[[^\]]+\]\]\s*)$/); const body = m ? m[1] : t, tok = m ? m[2] : ""; const parts = body.split("; ");
+    if(parts.length < 3) return cite(t);
+    const k = parts[0].lastIndexOf(": "); const lead = k >= 0 ? parts[0].slice(0, k + 1) : ""; parts[0] = k >= 0 ? parts[0].slice(k + 2) : parts[0];
+    return `${lead}<ul>${parts.map(x=>`<li>${x}</li>`).join("")}</ul>${cite(tok)}`; };
+  host.innerHTML = G.map((rows,i)=> rows.length ? `<div class="rgroup"><h4>${TITLES[i]}</h4>${rows.map(r=>`<div class="rrow"><div class="rwho">${REG[r[0]]?`<span class="rg ${r[0]}">${REG[r[0]].name}</span>`:"National"}<small>${attr(r[1])}</small></div><div class="rtxt">${bullets(r[2])}</div></div>`).join("")}</div>` : "").join("");
+})();
+(function(){
+  const host = $("#gloss"), Gl = RS.glossary; if(!host || !Gl) return;
+  host.innerHTML = Gl.map(g=>`<div><dt>${attr(g[0])}</dt><dd>${cite(g[1])}</dd></div>`).join("");
+})();
+
+/* ---------- researched findings: a filterable table per topic ---------- */
+$$(".findings[data-topic]").forEach(host=>{
+  const T = (typeof RESEARCH !== "undefined" && RESEARCH[host.dataset.topic]) || null; if(!T) return;
+  const pick = host.dataset.pick ? new RegExp(host.dataset.pick) : null;
+  const rows = T.rows.filter(r=>!pick || pick.test(r[1]));
+  const items = Array.from(new Set(rows.map(r=>r[1])));
+  const label = s => s.replace(/^\d+\s+/, "").replace(/^([a-z])/, c=>c.toUpperCase()).replace(/-/g, " ");
+  const regs = ["on","qc","we","at"].filter(r=>rows.some(x=>x[0]===r));
+  let region = "all", item = "all";
+  host.innerHTML = `<div class="toolbar">${regs.length>1?`<span class="lab">Region</span><div class="seg fr">${[["all","All"]].concat(regs.map(r=>[r,REG[r].name])).map(x=>`<button type="button" data-r="${x[0]}" aria-pressed="${x[0]==="all"}"${x[0]!=="all"?` style="--c:var(--${x[0]})"`:""}>${x[0]!=="all"?'<span class="sw"></span>':""}${x[1]}</button>`).join("")}</div>`:""}${items.length>1?`<label>Show <select class="fi"><option value="all">Everything (${rows.length})</option>${items.map((x,i)=>`<option value="${i}">${attr(label(x))} (${rows.filter(r=>r[1]===x).length})</option>`).join("")}</select></label>`:""}<span class="fcount mono"></span></div><div class="frame scroll fbox"><table class="tbl ftbl"><thead><tr><th>Region</th><th>What the source says</th></tr></thead><tbody></tbody></table></div>`+
+    (T.open.length && host.dataset.open !== "no" ? `<details class="fopen"><summary>${T.open.length} point${T.open.length>1?"s":""} the sources had not settled (as of ${ACCESSED})</summary><ul>${T.open.map(o=>`<li>${o[0]!=="all"&&REG[o[0]]?`<span class="rg ${o[0]}">${REG[o[0]].name}</span> `:""}${o[1]}</li>`).join("")}</ul></details>` : "");
+  const tb = $("tbody", host), cnt = $(".fcount", host);
+  function draw(){
+    let h = "", n = 0;
+    items.forEach((it,i)=>{
+      if(item !== "all" && +item !== i) return;
+      const rs = rows.filter(r=>r[1]===it && (region==="all" || r[0]===region || r[0]==="all")); if(!rs.length) return;
+      h += `<tr class="grp"><th colspan="2">${attr(label(it))}</th></tr>` + rs.map(r=>`<tr><th scope="row">${REG[r[0]]?`<span class="rg ${r[0]}">${REG[r[0]].short||REG[r[0]].name}</span>`:"All"}</th><td>${cite(r[2])}</td></tr>`).join(""); n += rs.length;
+    });
+    tb.innerHTML = h || `<tr><td colspan="2" class="tbd">Nothing published for this selection.</td></tr>`; cnt.textContent = n + " of " + rows.length;
+  }
+  $$(".fr button", host).forEach(b=>b.addEventListener("click",()=>{ region = b.dataset.r; $$(".fr button", host).forEach(o=>o.setAttribute("aria-pressed", String(o===b))); draw(); }));
+  const sel = $(".fi", host); if(sel) sel.addEventListener("change",()=>{ item = sel.value; draw(); });
+  draw();
+});
 
 /* ---------- references ---------- */
 (function(){

@@ -20,7 +20,14 @@ const SKIP = "script,style,svg,button,select,option,textarea,input,.nt-ui,.nt-in
 const POLL_MS = 20000;
 const MARKER_FILE = "folder.js";                                   // tells the guide a notes folder sits next to it
 const MARKER = "/* Marks this folder as the shared notes folder of the CPA guide. Please do not delete. */\nwindow.__cpaGuideNotesFolder = true;\n";
-const DIR_KEY = "dir:" + location.pathname;                        // each copy of the guide remembers its own folder
+const DIR_KEY = "dir:" + location.pathname;
+/* Reading without connecting: beside each person's <id>.json the guide also writes <id>.js, and people.js lists who
+   has notes. A page may load scripts from its own folder without any permission, so everyone's notes can be shown
+   as soon as the guide opens. Connecting (one folder pick and a name) is needed only to write. */
+const PEOPLE_FILE = "people.js";
+const safeJson = o => JSON.stringify(o).replace(/</g, "\\u003c");
+const wrapNotes = d => "/* One person's notes, in a form the guide can read without being connected. Written by the guide: do not edit. */\nwindow.__cpaGuideNotes&&window.__cpaGuideNotes(" + safeJson(d) + ");\n";
+const wrapPeople = l => "/* Who has notes in this folder. Written by the guide: do not edit. */\nwindow.__cpaGuidePeople&&window.__cpaGuidePeople(" + safeJson(l) + ");\n";                        // each copy of the guide remembers its own folder
 const mk = (tag, attrs, html) => { const e=document.createElement(tag); if(attrs) for(const k in attrs){ if(k==="class") e.className=attrs[k]; else e.setAttribute(k,attrs[k]); } if(html!=null) e.innerHTML=html; return e; };
 const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const now = () => Date.now();
@@ -38,6 +45,7 @@ let fileHandle = null, autoFile = false, fileDirty = false, storageOK = true;
 let dir = null, share = "off", shareMsg = "", lastSync = 0, syncing = false, mineDirty = false, claimAsk = null;
 let dirAuthors = new Map(); const fileCache = new Map();
 let notesBeside = null, pendingPick = null, markerOK = false, hintOff = false;
+let pubPeople = null, pubInbox = [], pubSig = "", pubBusy = false, localOnly = false;
 let lastColor = "y", pending = null, editing = null, saveTimer = null, applyTimer = null, writeTimer = null;
 let viewWho = "all", viewShow = "open", replyOpen = null, replyDraft = "", listStale = false;
 
@@ -149,6 +157,10 @@ function wrap(note, loc){
     const n = loc.nodes[i], ns = loc.starts[i], ne = ns + n.data.length;
     if(ne <= loc.start || ns >= loc.end) continue;
     const s = Math.max(loc.start, ns) - ns, e = Math.min(loc.end, ne) - ns; if(e <= s) continue;
+    /* Inside a flex or grid row every piece of text becomes its own item with a gap, so a highlight in the middle
+       of a word would pull the word apart. Keep the whole text in one wrapper first. */
+    const par = n.parentNode;
+    if(par && par.nodeType === 1 && /flex|grid/.test(getComputedStyle(par).display)){ const keep = mk("span", {class:"nt-keep"}); par.insertBefore(keep, n); keep.appendChild(n); }
     let t = n; if(e < t.data.length) t.splitText(e); if(s > 0) t = t.splitText(s);
     if(!t.data.trim()) continue;
     const m = mk("mark", {class:"nt-hl", "data-note":note.id, "data-sig":sigOf(note), tabindex:"0", role:"button"});
@@ -211,11 +223,13 @@ const drawer = mk("aside", {class:"nt-ui nt-drawer", hidden:"", "aria-label":"No
   '<p class="nt-status" id="ntStatus" aria-live="polite"></p>'+
   '<div class="nt-filters"><select id="ntWho" aria-label="Whose notes" hidden></select><select id="ntShow" aria-label="Which notes"><option value="open">Open or awaiting rebuild</option><option value="closed">Closed</option><option value="all">Open and closed</option></select><input type="search" id="ntSearch" placeholder="Search notes" aria-label="Search notes"></div>'+
   '<div class="nt-list" id="ntList"></div>'+
-  '<p class="nt-help">Select any text in the guide, then choose <b>Note</b> or <b>Suggest wording</b>. Click a highlight to open it. An accepted wording change stays marked in the text until the guide is rebuilt with it. Your notes are kept in this browser as you type. Working alone, use <b>Save my notes into this file</b> so they travel with the HTML. Working as a team, connect the shared notes folder: each person’s notes are saved to their own file there.</p>'+
+  '<p class="nt-help">Select any text in the guide, then choose <b>Note</b> or <b>Suggest wording</b>. Click a highlight to open it. An accepted wording change stays marked in the text until the guide is rebuilt with it. Your notes are kept in this browser as you type. Working alone, use <b>Save my notes into this file</b> so they travel with the HTML. Working as a team, everyone’s notes show by themselves when the guide is opened from the shared folder; connect once to add your own, which are saved to your own file there.</p>'+
   '<input type="file" id="ntFile" accept=".json,application/json" multiple hidden>');
 const hintEl = mk("div", {class:"nt-ui nt-teamhint", hidden:"", role:"status"});
 [addBox, fab, hintEl, pop, drawer].forEach(e=>document.body.appendChild(e));
 const $ = id => document.getElementById(id);
+/* tell the page when the panel is open, so it can make room for it */
+new MutationObserver(()=>document.documentElement.classList.toggle("nt-open", !drawer.hidden)).observe(drawer, {attributes:true, attributeFilter:["hidden"]});
 
 function place(el, rect){
   el.hidden = false;
@@ -258,6 +272,7 @@ function setStatus(n, s){
 }
 function commit(){
   writeLocal(); fileDirty = true; mineDirty = true; badges();
+  if(share === "off" && notesBeside && !localOnly){ localOnly = true; hintOff = false; renderShare(); }
   if(dir && me && share === "on"){ clearTimeout(writeTimer); writeTimer = setTimeout(()=>{ writeMine().then(renderShare, ()=>setShare("error")); }, 500); }
   else if(autoFile && fileHandle){ clearTimeout(saveTimer); saveTimer = setTimeout(()=>saveToFile(true), 1200); }
 }
@@ -360,13 +375,33 @@ function openThread(id){
 }
 
 /* ---------- shared folder: one file per person ---------- */
-function parseShared(text){
-  try{
-    const d = JSON.parse(text);
-    if(!d || typeof d.format !== "string" || d.format.indexOf("cpa-guide-notes/") !== 0 || !d.author || !Array.isArray(d.items)) return null;
-    const id = slug(d.author.id || ""); if(!id) return null;
-    return { author: {id, name: String(d.author.name || id).slice(0, 80)}, updated: Number(d.updated) || 0, items: d.items.filter(n=>n && typeof n.id === "string" && n.id.length < 80) };
-  }catch(e){ return null; }
+function checkShared(d){
+  if(!d || typeof d.format !== "string" || d.format.indexOf("cpa-guide-notes/") !== 0 || !d.author || !Array.isArray(d.items)) return null;
+  const id = slug(d.author.id || ""); if(!id) return null;
+  return { author: {id, name: String(d.author.name || id).slice(0, 80)}, updated: Number(d.updated) || 0, items: d.items.filter(n=>n && typeof n.id === "string" && n.id.length < 80) };
+}
+function parseShared(text){ try{ return checkShared(JSON.parse(text)); }catch(e){ return null; } }
+/* ---------- reading everyone's notes without connecting ---------- */
+function loadScript(src, done){ const s = document.createElement("script"); s.src = src; s.onload = () => { s.remove(); done(true); }; s.onerror = () => { s.remove(); done(false); }; document.head.appendChild(s); }
+window.__cpaGuidePeople = l => { pubPeople = Array.isArray(l) ? l : []; };
+window.__cpaGuideNotes = d => { const data = checkShared(d); if(data) pubInbox.push(data); };
+function loadPublic(){
+  if(dir || share !== "off" || !notesBeside || pubBusy) return;
+  pubBusy = true; pubPeople = null; pubInbox = []; const stamp = now();
+  const finish = () => {
+    pubBusy = false; if(dir || share !== "off") return;
+    const seen = pubInbox.filter(d=>!(me && d.author.id === me.id));
+    const sig = JSON.stringify(seen.map(d=>[d.author.id, d.updated]).sort());
+    if(sig === pubSig) return; pubSig = sig;
+    others.clear(); seen.forEach(d=>{ d.items.forEach(n=>owner.set(n, d.author)); others.set(d.author.id, {name:d.author.name, items:d.items}); });
+    applyAll(); renderShare();
+  };
+  loadScript("notes/" + PEOPLE_FILE + "?t=" + stamp, ok=>{
+    if(!ok || !pubPeople){ finish(); return; }
+    const ids = Array.from(new Set(pubPeople.map(x=>slug((x && x.id) || "")).filter(Boolean))).slice(0, 200);
+    let left = ids.length; if(!left){ finish(); return; }
+    ids.forEach(id=>loadScript("notes/" + encodeURIComponent(id) + ".js?t=" + stamp, ()=>{ if(--left === 0) finish(); }));
+  });
 }
 function setShare(state, msg){ share = state; shareMsg = msg || ""; renderShare(); badges(); }
 function renderShare(){
@@ -385,12 +420,14 @@ function renderShare(){
   } else if(share === "confirm"){
     h = '<p><b>“'+esc(pendingPick ? pendingPick.name : "")+'” does not hold this guide.</b> Create the notes folder there anyway? Other people must connect to the same place to see each other’s notes.</p><div class="nt-row">'+btn("force","Create it there",true)+btn("create","Pick again")+btn("stop","Cancel")+'</div>';
   } else if(window.showDirectoryPicker){
-    if(notesBeside) h = '<p><b>Team notes are available.</b> A shared <code>notes</code> folder sits next to this guide. Connect to see and answer other people’s notes.</p><p>The browser will ask you to choose a folder: pick the one that holds this guide. It asks once; after that it reconnects by itself or with one click.</p><div class="nt-row">'+btn("connect","Connect",true)+'</div>';
+    if(notesBeside && others.size) h = '<p><b>You are seeing your team’s notes</b> ('+others.size+(others.size===1 ? " person" : " people")+'). Reading needs nothing from you.</p><p><b>To add notes, reply or accept changes so that others see them, connect once.</b> The browser asks you to choose the folder that holds this guide, then the guide asks for your name. After that it reconnects by itself or with one click.</p><div class="nt-row">'+btn("connect","Connect to add your own",true)+'</div>';
+    else if(notesBeside) h = '<p><b>This guide is set up for team notes</b>, and nobody has added one yet.</p><p>To add notes that others can see, connect once: the browser asks you to choose the folder that holds this guide, then the guide asks for your name.</p><div class="nt-row">'+btn("connect","Connect to add notes",true)+'</div>';
     else h = '<p><b>Working alone.</b> '+(notesBeside === false ? 'There is no <code>notes</code> folder next to this guide yet.' : 'Looking for a <code>notes</code> folder next to this guide…')+' To share notes with other people, create one here or point to one kept elsewhere.</p><p>The browser will ask you to choose a folder. To create it here, pick the folder that holds this guide.</p><div class="nt-row">'+btn("create","Create notes folder here",true)+btn("any","Use a folder elsewhere")+'</div>';
   } else {
     h = '<p><b>Working alone.</b> Shared notes need Chrome or Edge on a computer. In this browser you can still read other people’s notes: choose <b>Import</b> and pick their files from the shared <code>notes</code> folder.</p>';
   }
-  if(share === "off" && others.size) h += '<p>Showing notes from '+others.size+(others.size===1 ? " other person" : " other people")+', read-only, from the files you opened.</p>';
+  if(share === "off" && others.size && !notesBeside) h += '<p>Showing notes from '+others.size+(others.size===1 ? " other person" : " other people")+', read-only, from the files you opened.</p>';
+  if(share === "off" && notesBeside && localOnly) h += '<p class="nt-warn">Your own notes and replies are saved on this computer only for now. Connect to share them with the team.</p>';
   if(shareMsg) h += '<p class="nt-warn">'+esc(shareMsg)+'</p>';
   box.innerHTML = h;
   $("ntSaveFile").hidden = share !== "off";
@@ -401,7 +438,9 @@ function renderHint(){
   let h = "";
   if(!hintOff && drawer.hidden && window.showDirectoryPicker){
     if(share === "need") h = 'Shared notes are paused. <button type="button" data-s="reconnect">Reconnect</button>';
-    else if(share === "off" && notesBeside) h = 'Your team’s notes are available for this guide. <button type="button" data-s="connect">Connect</button>';
+    else if(share === "off" && notesBeside && localOnly) h = 'Your note is saved on this computer only. <button type="button" data-s="connect">Connect</button> to share it with the team.';
+    else if(share === "off" && notesBeside && others.size) h = 'You are seeing your team’s notes. To add your own, <button type="button" data-s="connect">connect</button> once.';
+    else if(share === "off" && notesBeside) h = 'This guide is set up for team notes. <button type="button" data-s="connect">Connect</button> to add the first.';
   }
   hintEl.hidden = !h; if(h) hintEl.innerHTML = '<span>'+h+'</span><button type="button" data-s="hide" class="nt-x" aria-label="Dismiss">×</button>';
 }
@@ -437,7 +476,7 @@ async function ensureMarker(){
 }
 async function useDir(h){ dir = h; fileCache.clear(); mineDirty = true; markerOK = false; await sync(); }
 async function reconnect(){ if(!dir) return; try{ const p = await dir.requestPermission({mode:"readwrite"}); if(p === "granted") await sync(); else setShare("need"); }catch(e){ setShare("need"); } }
-function stopSharing(){ dir = null; pendingPick = null; fileCache.clear(); others.clear(); dirAuthors = new Map(); claimAsk = null; idb("readwrite", st=>st.delete(DIR_KEY)); setShare("off"); applyAll(); }
+function stopSharing(){ dir = null; pendingPick = null; fileCache.clear(); others.clear(); dirAuthors = new Map(); claimAsk = null; idb("readwrite", st=>st.delete(DIR_KEY)); pubSig = ""; setShare("off"); applyAll(); loadPublic(); }
 function join(claimed){
   const el = $("ntName"), name = claimed && claimAsk ? claimAsk.name : ((el && el.value) || "").replace(/\s+/g, " ").trim(); if(!name) return;
   const id = slug(name) || ("p" + Math.random().toString(36).slice(2,8));
@@ -446,17 +485,32 @@ function join(claimed){
 }
 async function writeMine(){
   if(!dir || !me) return;
-  const fh = await dir.getFileHandle(me.id + ".json", {create:true});
-  const w = await fh.createWritable();
-  await w.write(JSON.stringify({format:FORMAT, author:me, updated:now(), items:notes}, null, 1)); await w.close();
-  mineDirty = false;
+  const data = {format:FORMAT, author:me, updated:now(), items:notes};
+  const put = async (name, text) => { const fh = await dir.getFileHandle(name, {create:true}), w = await fh.createWritable(); await w.write(text); await w.close(); };
+  await put(me.id + ".json", JSON.stringify(data, null, 1));
+  await put(me.id + ".js", wrapNotes(data)).catch(()=>{});          // the copy that can be read without connecting
+  mineDirty = false; localOnly = false;
+}
+/* people.js is the one file more than one person writes. It only lists names, every browser re-adds whoever is
+   missing each time it syncs, so a lost update repairs itself. */
+async function writePeople(found){
+  if(!dir || !me) return;
+  try{
+    let cur = [];
+    try{ const m = (await (await (await dir.getFileHandle(PEOPLE_FILE)).getFile()).text()).match(/__cpaGuidePeople\((\[[\s\S]*\])\);/); if(m) cur = JSON.parse(m[1]); }catch(e){}
+    const map = new Map(); (Array.isArray(cur) ? cur : []).forEach(x=>{ const id = slug((x && x.id) || ""); if(id) map.set(id, String(x.name || id).slice(0, 80)); });
+    found.forEach((o, id)=>map.set(id, o.name)); map.set(me.id, me.name);
+    const list = Array.from(map, x=>({id:x[0], name:x[1]})).sort((a,b)=>a.id < b.id ? -1 : 1);
+    if(JSON.stringify(list) !== JSON.stringify(cur)){ const fh = await dir.getFileHandle(PEOPLE_FILE, {create:true}), w = await fh.createWritable(); await w.write(wrapPeople(list)); await w.close(); }
+  }catch(e){}
 }
 async function sync(){
   if(!dir || syncing) return; syncing = true;
   try{
     const found = new Map(), seenFiles = new Set(); let changed = false;
     for await (const entry of dir.entries()){
-      const name = entry[0], h = entry[1]; if(h.kind !== "file" || !/\.json$/i.test(name)) continue;
+      const name = entry[0], h = entry[1]; if(h.kind !== "file") continue;
+      if(!/\.json$/i.test(name)){ if(/\.js$/i.test(name)) seenFiles.add(name); continue; }
       seenFiles.add(name); let rec = fileCache.get(name);
       try{
         const f = await h.getFile(), sig = f.lastModified + ":" + f.size;
@@ -465,6 +519,7 @@ async function sync(){
       if(rec){ const a = rec.data.author; if(!found.has(a.id)) found.set(a.id, {name:a.name, at:-1, lists:[]}); const o = found.get(a.id); o.lists.push(rec.data.items); if(rec.data.updated > o.at){ o.at = rec.data.updated; o.name = a.name; } }
     }
     Array.from(fileCache.keys()).forEach(k=>{ if(!seenFiles.has(k)){ fileCache.delete(k); changed = true; } });
+    pubSig = "";
     dirAuthors = found;
     if(!me){ syncing = false; setShare("name"); return; }
     const mineDisk = found.get(me.id), diskItems = mineDisk ? mineDisk.lists.reduce(merge, []) : [];
@@ -474,7 +529,8 @@ async function sync(){
     found.forEach((o, id)=>{ if(id === me.id) return; const items = o.lists.reduce(merge, []); items.forEach(n=>owner.set(n, {id, name:o.name})); others.set(id, {name:o.name, items}); });
     if(others.size !== before) changed = true;
     if(mineDirty || !mineDisk) await writeMine();
-    await ensureMarker();
+    else if(!seenFiles.has(me.id + ".js")) await writeMine();          // a folder from before the readable copies existed
+    await ensureMarker(); await writePeople(found);
     lastSync = now(); const first = share !== "on"; share = "on"; shareMsg = "";
     if(changed || first) applyAll();
     renderShare(); badges();
@@ -489,7 +545,7 @@ $("ntShare").addEventListener("click", e=>{
   else if(a==="join") join(false); else if(a==="claim") join(true); else if(a==="rename"){ claimAsk = null; renderShare(); const el = $("ntName"); if(el) el.focus(); }
 });
 $("ntShare").addEventListener("keydown", e=>{ if(e.key === "Enter" && e.target.id === "ntName" && !e.isComposing){ e.preventDefault(); join(false); } });
-setInterval(()=>{ if(dir && (share === "on" || share === "error") && !document.hidden) sync(); }, POLL_MS);
+setInterval(()=>{ if(document.hidden) return; if(dir && (share === "on" || share === "error")) sync(); else if(!dir && share === "off") loadPublic(); }, POLL_MS);
 document.addEventListener("visibilitychange", ()=>{ if(dir && !document.hidden && (share === "on" || share === "error")) sync(); });
 
 /* ---------- events ---------- */
@@ -616,7 +672,7 @@ applyAll();
 try{ hintOff = sessionStorage.getItem("cpa-guide-hint-off") === "1"; }catch(e){}
 (function lookBeside(){                                            // a page may load a script from its own folder, even from a file
   const s = document.createElement("script"); s.src = "notes/" + MARKER_FILE;
-  s.onload = () => { notesBeside = true; s.remove(); renderShare(); };
+  s.onload = () => { notesBeside = true; s.remove(); renderShare(); loadPublic(); };
   s.onerror = () => { notesBeside = false; s.remove(); renderShare(); };
   document.head.appendChild(s);
 })();
@@ -625,5 +681,5 @@ if(window.showDirectoryPicker) idb("readonly", st=>st.get(DIR_KEY)).then(async h
   dir = h;
   try{ if(await h.queryPermission({mode:"readwrite"}) === "granted"){ mineDirty = true; await sync(); } else setShare("need"); }catch(e){ setShare("need"); }
 });
-window.__guideNotes = { htmlWithNotes, all: () => notes, useDir, adopt, sync, state: () => ({share, me, people: Array.from(others.keys()), threads: threads.length, dir: dir && dir.name, notesBeside}) };
+window.__guideNotes = { htmlWithNotes, all: () => notes, useDir, adopt, sync, loadPublic, state: () => ({share, me, people: Array.from(others.keys()), threads: threads.length, dir: dir && dir.name, notesBeside}) };
 })();
